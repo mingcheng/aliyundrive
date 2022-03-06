@@ -17,31 +17,31 @@ package aliyundrive
 
 import (
 	"context"
-	"net/http"
+	"time"
 )
 
-func (r *AuthService) getToken(ctx context.Context, request *getTokenReq) (*RefreshTokenResp, error) {
-	req := &RawRequestReq{
-		Scope:  "Auth",
-		API:    "GetToken",
-		Method: http.MethodPost,
-		URL:    "https://api.aliyundrive.com/token/get",
-		Body: &getTokenReq{
-			Code:      request.Code,
-			LoginType: "normal",
-			DeviceId:  "aliyundrive",
-		},
-	}
-	resp := new(RefreshTokenResp)
-
-	if _, err := r.cli.RawRequest(ctx, req, resp); err != nil {
-		return nil, err
-	}
-	return resp, nil // r.cli.token.Refresh(resp.AccessToken, resp.RefreshToken, time.Now().Add(time.Second*time.Duration(resp.ExpiresIn)))
+type Token struct {
+	AccessToken  string    `json:"access_token"`
+	ExpiredAt    time.Time `json:"expired_at"` // access-token 的过期时间，秒级
+	RefreshToken string    `json:"refresh_token"`
 }
 
 type getTokenReq struct {
 	Code      string `json:"code"`
 	LoginType string `json:"loginType"`
 	DeviceId  string `json:"deviceId"`
+}
+
+func (r *AliyunDrive) Token(ctx context.Context, request *getTokenReq) (*RefreshTokenResp, error) {
+	response, err := r.Client.R().SetBody(getTokenReq{
+		Code:      request.Code,
+		LoginType: "normal",
+		DeviceId:  "aliyundrive",
+	}).SetResult(RefreshTokenResp{}).Post("https://api.aliyundrive.com/token/get")
+
+	if err != nil {
+		return nil, err
+	}
+
+	return response.Result().(*RefreshTokenResp), nil
 }
