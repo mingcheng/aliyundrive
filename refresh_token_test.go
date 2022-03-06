@@ -2,26 +2,28 @@ package aliyundrive
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestAuthService_RefreshToken(t *testing.T) {
-	refreshToken, empty := os.LookupEnv("REFRESH_TOKEN")
-	if !empty {
-		return
-	}
+	cli := NewDrive(t)
+	assert.NotNil(t, cli)
 
-	cli := New()
+	resp, err := cli.MySelf(context.TODO())
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
 
-	// 获取 refresh_token 可以通过网页端： JSON.parse(localStorage.token).refresh_token
-	token, err := cli.Auth.RefreshToken(context.TODO(), &RefreshTokenReq{
-		RefreshToken: refreshToken,
+	refreshToken, err := cli.store.Get(context.TODO(), KeyRefreshToken)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, refreshToken)
+
+	token, err := cli.RefreshToken(context.TODO(), &RefreshTokenReq{
+		RefreshToken: string(refreshToken),
 	})
-
 	assert.NoError(t, err)
 	assert.NotNil(t, token)
 	assert.NotEmpty(t, token.RefreshToken)
+	assert.NotEmpty(t, token.AccessToken)
 }

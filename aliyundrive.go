@@ -16,46 +16,106 @@
 package aliyundrive
 
 import (
-	"path/filepath"
+	"context"
+	"fmt"
+	"net/http"
+
+	"github.com/go-resty/resty/v2"
+	"github.com/sirupsen/logrus"
 )
 
-func New(options ...ClientOptionFunc) *AliyunDrive {
-	return newClient(options)
+const KeyAccessToken = "aliyun_drive_access_token"
+const KeyRefreshToken = "aliyun_drive_refresh_token"
+
+const userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36 Edg/98.0.1108.62"
+
+type AliyunDrive struct {
+	logger *logrus.Logger
+	client *resty.Client
+	store  Store
+
+	accessToken string
 }
 
-type ClientOptionFunc func(*AliyunDrive)
+type config struct {
+	Method string
+	URL    string
+	Body   interface{}
+}
 
-func WithLogger(logger Logger, level LogLevel) ClientOptionFunc {
+func (r *AliyunDrive) request(ctx context.Context, req *config, result interface{}) (*resty.Response, error) {
+	request := r.client.R().SetContext(ctx)
+
+	if req.Body != nil {
+		request.SetBody(req.Body)
+	}
+
+	if result != nil {
+		request.SetResult(result)
+	}
+
+	response, err := request.Execute(req.Method, req.URL)
+	if err != nil {
+		return nil, err
+	}
+
+	if !response.IsSuccess() {
+		return nil, fmt.Errorf("%s", response.Status())
+	}
+
+	return response, err
+}
+
+func (r *AliyunDrive) log(level logrus.Level, args ...interface{}) {
+	r.logger.Log(level, args...)
+}
+
+func New(options ...OptionFunc) *AliyunDrive {
+	client := resty.New()
+	r := &AliyunDrive{
+		logger: logrus.New(),
+		client: client,
+	}
+
+	client.OnBeforeRequest(func(client *resty.Client, request *resty.Request) error {
+		request.SetHeader("User-Agent", userAgent)
+		request.SetHeader("Referer", "https://www.aliyundrive.com/")
+
+		if request.Method == http.MethodPost {
+			request.SetHeader("Content-Type", "application/json; charset=utf-8")
+		}
+
+		if r.accessToken != "" {
+			request.SetAuthToken(r.accessToken)
+		}
+
+		return nil
+	})
+
+	for _, v := range options {
+		if v != nil {
+			v(r)
+		}
+	}
+
+	return r
+}
+
+type OptionFunc func(*AliyunDrive)
+
+func WithLogger(logger *logrus.Logger) OptionFunc {
 	return func(ins *AliyunDrive) {
 		ins.logger = logger
-		ins.logLevel = level
 	}
 }
 
-func WithWorkDir(dir string) ClientOptionFunc {
+func WithStore(store Store) OptionFunc {
 	return func(ins *AliyunDrive) {
-		path, err := filepath.Abs(dir)
-		if err != nil {
-			panic(err)
+		token, err := store.Get(context.Background(), KeyAccessToken)
+		if err == err && token != nil {
+			ins.accessToken = string(token)
 		}
-		ins.workDir = path
-	}
-}
 
-func WithStore(store Store) ClientOptionFunc {
-	return func(ins *AliyunDrive) {
 		ins.store = store
 	}
-}
-
-type AuthService struct {
-	cli *AliyunDrive
-}
-
-type FileService struct {
-	cli *AliyunDrive
-}
-
-type ShareLinkService struct {
-	cli *AliyunDrive
 }

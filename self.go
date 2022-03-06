@@ -17,31 +17,9 @@ package aliyundrive
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 )
-
-func (r *AuthService) GetSelfUser(ctx context.Context) (*GetSelfUserResp, error) {
-	req := &RawRequestReq{
-		Scope:   "Auth",
-		API:     "GetSelfUser",
-		Method:  http.MethodPost,
-		URL:     "https://api.aliyundrive.com/v2/user/get",
-		Body:    struct{}{},
-		IsFile:  false,
-		headers: nil,
-	}
-	resp := new(getSelfUserResp)
-
-	if _, err := r.cli.RawRequest(ctx, req, resp); err != nil {
-		return nil, err
-	}
-	return &resp.GetSelfUserResp, nil
-}
-
-type getSelfUserResp struct {
-	Message string `json:"message"`
-	GetSelfUserResp
-}
 
 type GetSelfUserResp struct {
 	DomainID                    string      `json:"domain_id"`
@@ -60,4 +38,25 @@ type GetSelfUserResp struct {
 	DenyChangePasswordBySelf    bool        `json:"deny_change_password_by_self"`
 	NeedChangePasswordNextLogin bool        `json:"need_change_password_next_login"`
 	Permission                  interface{} `json:"permission"`
+}
+
+func (r *AliyunDrive) MySelf(ctx context.Context) (*GetSelfUserResp, error) {
+	var result GetSelfUserResp
+
+	req := config{
+		Method: http.MethodPost,
+		URL:    "https://api.aliyundrive.com/v2/user/get",
+		Body:   "{}",
+	}
+
+	_, err := r.request(ctx, &req, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	if result.UserID == "" {
+		return nil, fmt.Errorf("user id is empty, pls check")
+	}
+
+	return &result, nil
 }

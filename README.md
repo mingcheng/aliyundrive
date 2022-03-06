@@ -1,11 +1,24 @@
 # go-aliyundrive
 
-> 阿里云盘 Go SDK
+> 阿里云盘 Go SDK ，基于 https://github.com/chyroc/go-aliyundrive ，但因原作者对于细节的把控粒度的分歧、加上本人的精力有限，因此不再往原项目提交 PR，感谢理解。
+
+## 和 chyroc 的版本有什么不同？
+
+重点关注接口以及功能的稳定性方面
+精简代码结构
+增加每个功能对应的测试用例
+去除不必要的第三方库（例如控制台二维码输出、自己造轮子的 HTTP 请求库等）
+增加实现配置保存的方式（内存、文件、以及 Redis）
+
+
+## 更新记录
+
+
 
 ## 安装
 
 ```shell
-go get github.com/chyroc/go-aliyundrive
+go get github.com/mingcheng/aliyundrive
 ```
 
 ## 使用
@@ -13,9 +26,7 @@ go get github.com/chyroc/go-aliyundrive
 ### 初始化 SDK 实例
 
 ```go
-ins := aliyundrive.New()
-
-// 下面所有提到的 ins 都是指这个实例
+driver := aliyundrive.New()
 ```
 
 ### 登录

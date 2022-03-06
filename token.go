@@ -17,31 +17,39 @@ package aliyundrive
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 	"time"
 )
 
 type Token struct {
 	AccessToken  string    `json:"access_token"`
-	ExpiredAt    time.Time `json:"expired_at"` // access-token 的过期时间，秒级
+	ExpiredAt    time.Time `json:"expired_at"`
 	RefreshToken string    `json:"refresh_token"`
 }
 
-type getTokenReq struct {
+type TokenReq struct {
 	Code      string `json:"code"`
 	LoginType string `json:"loginType"`
-	DeviceId  string `json:"deviceId"`
+	DeviceID  string `json:"deviceId"`
 }
 
-func (r *AliyunDrive) Token(ctx context.Context, request *getTokenReq) (*RefreshTokenResp, error) {
-	response, err := r.Client.R().SetBody(getTokenReq{
-		Code:      request.Code,
-		LoginType: "normal",
-		DeviceId:  "aliyundrive",
-	}).SetResult(RefreshTokenResp{}).Post("https://api.aliyundrive.com/token/get")
+func (r *AliyunDrive) Token(ctx context.Context, request *TokenReq) (*RefreshTokenResp, error) {
+	var result RefreshTokenResp
+
+	response, err := r.request(ctx, &config{
+		Method: http.MethodPost,
+		URL:    "https://api.aliyundrive.com/token/get",
+		Body:   request,
+	}, &result)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return response.Result().(*RefreshTokenResp), nil
+	if !response.IsSuccess() {
+		return nil, fmt.Errorf("%s", response.Error())
+	}
+
+	return &result, nil
 }

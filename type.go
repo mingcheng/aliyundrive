@@ -1,10 +1,13 @@
 package aliyundrive
 
-type FileType string // 文件类型枚举
+const (
+	TypeFolder = "folder"
+	TypeFile   = "file"
+)
 
 const (
-	FileTypeFolder FileType = "folder" // 文件夹
-	FileTypeFile   FileType = "file"   // 文件
+	ModeRefuse     = "refuse"
+	ModeAutoRename = "auto_rename"
 )
 
 const RootFileID = "root"

@@ -18,35 +18,9 @@ package aliyundrive
 import (
 	"context"
 	"fmt"
-	"net/http"
+	"strings"
 	"time"
 )
-
-func (r *AuthService) RefreshToken(ctx context.Context, request *RefreshTokenReq) (*RefreshTokenResp, error) {
-	request.GrantType = "refresh_token"
-
-	req := &RawRequestReq{
-		Scope:  "Auth",
-		API:    "RefreshToken",
-		Method: http.MethodPost,
-		// URL:    "https://api.aliyundrive.com/token/refresh",j
-		// @see https://github.com/wxy1343/aliyunpan/blob/1dd7309196f77a9420b17c2d87df37e8b0193138/aliyunpan/api/core.py#L581
-		URL:  "https://auth.aliyundrive.com/v2/account/token",
-		Body: request,
-	}
-	resp := new(RefreshTokenResp)
-
-	result, err := r.cli.RawRequest(ctx, req, resp)
-	if err != nil {
-		return nil, err
-	}
-
-	if result.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("api server response an error")
-	}
-
-	return resp, nil // r.cli.token.Refresh(resp.AccessToken, resp.RefreshToken, time.Now().Add(time.Second*time.Duration(resp.ExpiresIn)))
-}
 
 type RefreshTokenReq struct {
 	GrantType    string `json:"grant_type"`
@@ -86,10 +60,39 @@ type RefreshTokenResp struct {
 	Status         string        `json:"status"`
 }
 
-func (r *RefreshTokenResp) Token() *Token {
-	return &Token{
-		AccessToken:  r.AccessToken,
-		ExpiredAt:    time.Now().Add(time.Second * time.Duration(r.ExpiresIn)),
-		RefreshToken: r.RefreshToken,
+func (r *AliyunDrive) RefreshToken(ctx context.Context, request *RefreshTokenReq) (*RefreshTokenResp, error) {
+	if strings.TrimSpace(request.RefreshToken) == "" {
+		return nil, fmt.Errorf("refresh token is empty")
 	}
+
+	request.GrantType = "refresh_token"
+
+	response, err := r.client.R().
+		SetContext(ctx).
+		SetBody(request).
+		SetResult(RefreshTokenResp{}).
+		Post("https://auth.aliyundrive.com/v2/account/token")
+
+	if err != nil {
+		return nil, err
+	}
+
+	result := response.Result().(*RefreshTokenResp)
+	if strings.TrimSpace(result.RefreshToken) == "" {
+		return nil, fmt.Errorf("response refersh token is empty")
+	}
+
+	// save token information
+	if r.store != nil {
+		if err := r.store.Set(ctx, KeyAccessToken, []byte(result.AccessToken)); err != nil {
+			return nil, err
+		}
+
+		if err := r.store.Set(ctx, KeyRefreshToken, []byte(result.RefreshToken)); err != nil {
+			return nil, err
+		}
+	}
+
+	r.accessToken = result.AccessToken
+	return result, nil
 }

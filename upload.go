@@ -25,26 +25,14 @@ import (
 	"time"
 )
 
-func (r *FileService) UploadFile(ctx context.Context, request *UploadFileReq) (*UploadFileResp, error) {
-	file, err := os.Open(request.FilePath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-	fileInfo, err := file.Stat()
-	if err != nil {
-		return nil, err
-	} else if fileInfo.IsDir() {
-		// TODO：支持文件夹
-		return nil, fmt.Errorf("unsupport dir upload")
-	}
-	return r.UploadStream(ctx, request.DriveID, request.ParentID, path.Base(fileInfo.Name()), file, fileInfo.Size())
-}
+const maxPartSize = 1024 * 1024 * 1024 // 每个分片的大小
 
 type UploadFileReq struct {
-	DriveID  string
-	ParentID string
-	FilePath string
+	DriveID       string `json:"drive_id"`
+	ParentID      string `json:"parent_id"`
+	FilePath      string `json:"file_path"`
+	CheckNameMode string `json:"check_name_mode"`
+	Name          string `json:"name"`
 }
 
 type UploadFileResp struct {
@@ -74,64 +62,10 @@ type UploadFileResp struct {
 	Location string `json:"location"`
 }
 
-// UploadStream 从流上传文件
-func (r *FileService) UploadStream(ctx context.Context, driveID, parentID, name string, stream io.Reader, streamSize int64) (*UploadFileResp, error) {
-	proofResp, err := r.createFileWithProof(ctx, &createFileWithProofReq{
-		DriveID:       driveID,
-		PartInfoList:  makePartInfoList(streamSize),
-		ParentFileID:  parentID,
-		Name:          name,
-		Type:          "file",
-		CheckNameMode: "auto_rename",
-		Size:          streamSize,
-		PreHash:       "",
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	for _, part := range proofResp.PartInfoList {
-		// TODO: 并发？
-		if err := r.uploadPart(ctx, part.UploadURL, io.LimitReader(stream, maxPartSize)); err != nil {
-			return nil, err
-		}
-	}
-
-	return r.completeUpload(ctx, &completeUploadReq{
-		DriveID:  driveID,
-		UploadID: proofResp.UploadID,
-		FileID:   proofResp.FileID,
-	})
-}
-
-func makePartInfoList(size int64) []*partInfo {
-	partInfoNum := int(size / maxPartSize)
-	if size%maxPartSize > 0 {
-		partInfoNum += 1
-	}
-	res := []*partInfo{}
-	for i := 0; i < partInfoNum; i++ {
-		res = append(res, &partInfo{PartNumber: i + 1})
-	}
-	return res
-}
-
-// == create with proof ==
-
-func (r *FileService) createFileWithProof(ctx context.Context, request *createFileWithProofReq) (*createFileWithProofResp, error) {
-	req := &RawRequestReq{
-		Scope:  "File",
-		API:    "createFileWithProof",
-		Method: http.MethodPost,
-		URL:    "https://api.aliyundrive.com/v2/file/create_with_proof",
-		Body:   request,
-	}
-	resp := new(createFileWithProofResp)
-
-	if _, err := r.cli.RawRequest(ctx, req, resp); err != nil {
-		return nil, err
-	}
-	return resp, nil
+type completeUploadReq struct {
+	DriveID  string `json:"drive_id"`
+	UploadID string `json:"upload_id"`
+	FileID   string `json:"file_id"`
 }
 
 type createFileWithProofReq struct {
@@ -146,65 +80,140 @@ type createFileWithProofReq struct {
 }
 
 type partInfo struct {
-	PartNumber int    `json:"part_number"`
-	UploadURL  string `json:"upload_url"`
+	PartNumber        int    `json:"part_number"`
+	UploadURL         string `json:"upload_url"`
+	InternalUploadURL string `json:"internal_upload_url"`
+	ContentType       string `json:"content_type"`
 }
 
 type createFileWithProofResp struct {
+	Type         string      `json:"type"`
+	RapidUpload  bool        `json:"rapid_upload"`
+	DomainId     string      `json:"domain_id"`
+	DriveId      string      `json:"drive_id"`
+	FileName     string      `json:"file_name"`
+	EncryptMode  string      `json:"encrypt_mode"`
+	Location     string      `json:"location"`
 	UploadID     string      `json:"upload_id"`
 	FileID       string      `json:"file_id"`
-	PartInfoList []*partInfo `json:"part_info_list"`
+	PartInfoList []*partInfo `json:"part_info_list,omitempty"`
 }
 
-// == create with proof ==
+func makePartInfoList(size int64) []*partInfo {
+	var res []*partInfo
 
-// == upload part ==
-
-func (r *FileService) uploadPart(ctx context.Context, uri string, reader io.Reader) error {
-	req := &RawRequestReq{
-		Scope:  "File",
-		API:    "uploadPart",
-		Method: http.MethodPut,
-		URL:    uri,
-		Body:   reader,
+	partInfoNum := int(size / maxPartSize)
+	if size%maxPartSize > 0 {
+		partInfoNum += 1
 	}
 
-	response, err := r.cli.RawRequest(ctx, req, nil)
+	for i := 0; i < partInfoNum; i++ {
+		res = append(res, &partInfo{PartNumber: i + 1})
+	}
+
+	return res
+}
+
+func (r *AliyunDrive) UploadFile(ctx context.Context, request *UploadFileReq) (*UploadFileResp, error) {
+	file, err := os.Open(request.FilePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+
+	if fileInfo.IsDir() {
+		// TODO：支持文件夹
+		return nil, fmt.Errorf("unsupport dir upload")
+	}
+
+	if request.CheckNameMode == "" {
+		request.CheckNameMode = ModeRefuse
+	}
+
+	return r.UploadStream(ctx, request, file, fileInfo.Size())
+}
+
+func (r *AliyunDrive) UploadStream(ctx context.Context, request *UploadFileReq, stream io.Reader, streamSize int64) (*UploadFileResp, error) {
+	proofResp, err := r.createFileWithProof(ctx, &createFileWithProofReq{
+		DriveID:       request.DriveID,
+		PartInfoList:  makePartInfoList(streamSize),
+		ParentFileID:  request.ParentID,
+		Name:          path.Base(request.FilePath),
+		Type:          TypeFile,
+		CheckNameMode: request.CheckNameMode,
+		Size:          streamSize,
+		PreHash:       "",
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	for _, part := range proofResp.PartInfoList {
+		// TODO: 并发？
+		err = r.uploadPart(ctx, part.UploadURL, io.LimitReader(stream, maxPartSize))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return r.completeUpload(ctx, &completeUploadReq{
+		DriveID:  request.DriveID,
+		UploadID: proofResp.UploadID,
+		FileID:   proofResp.FileID,
+	})
+}
+
+func (r *AliyunDrive) createFileWithProof(ctx context.Context, request *createFileWithProofReq) (*createFileWithProofResp, error) {
+	var result createFileWithProofResp
+
+	response, err := r.request(ctx, &config{
+		Method: http.MethodPost,
+		URL:    "https://api.aliyundrive.com/adrive/v2/file/create_with_proof",
+		Body:   request,
+	}, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	if !response.IsSuccess() {
+		return nil, fmt.Errorf("%s", response.Status())
+	}
+
+	return &result, nil
+}
+
+func (r *AliyunDrive) uploadPart(ctx context.Context, uri string, reader io.Reader) error {
+	req, err := http.NewRequest(http.MethodPut, uri, reader)
+
+	response, err := r.client.GetClient().Do(req)
 	if err != nil {
 		return err
 	}
-	if response.StatusCode == http.StatusOK {
-		return nil
+
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("%s", response.Status)
 	}
-	return fmt.Errorf("upload_part failed, status: %d, resp: %s", response.StatusCode, response.Body)
+
+	return nil
 }
 
-// == upload part ==
+func (r *AliyunDrive) completeUpload(ctx context.Context, request *completeUploadReq) (*UploadFileResp, error) {
+	var result UploadFileResp
 
-// == complete upload ==
-
-func (r *FileService) completeUpload(ctx context.Context, request *completeUploadReq) (*UploadFileResp, error) {
-	req := &RawRequestReq{
-		Scope:  "File",
-		API:    "completeUpload",
+	_, err := r.request(ctx, &config{
 		Method: http.MethodPost,
-		URL:    "https://api.aliyundrive.com/v2/file/complete",
+		URL:    "https://api.aliyundrive.com/adrive/v2/file/complete",
 		Body:   request,
-	}
-	resp := new(UploadFileResp)
-
-	if _, err := r.cli.RawRequest(ctx, req, resp); err != nil {
+	}, &result)
+	if err != nil {
 		return nil, err
 	}
-	return resp, nil
+
+	return &result, nil
 }
-
-type completeUploadReq struct {
-	DriveID  string `json:"drive_id"`
-	UploadID string `json:"upload_id"`
-	FileID   string `json:"file_id"`
-}
-
-// == complete upload ==
-
-const maxPartSize = 1024 * 1024 * 1024 // 每个分片的大小

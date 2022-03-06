@@ -14,10 +14,10 @@
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
-.idea/
+/.idea
+/.vscode
 ttt/
 data.txt
 idx.txt
 aliyundrive
 coverage.txt
-
