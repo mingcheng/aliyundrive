@@ -20,12 +20,14 @@ func NewDrive(t *testing.T) *AliyunDrive {
 	assert.NoError(t, err)
 	assert.NotNil(t, client)
 
-	// using `JSON.parse(localStorage.token).refresh_token` to get refresh token from web
+	// using `JSON.parse(localStorage.token).refresh_token`
+	// to get token from web browser console
 	refreshToken, err := client.Get(context.TODO(), KeyRefreshToken)
-	if len(refreshToken) == 0 {
+	if err != nil || len(refreshToken) == 0 {
 		refreshToken = []byte(os.Getenv("REFRESH_TOKEN"))
 		assert.NotEmpty(t, refreshToken)
 	}
+	assert.NotEmpty(t, refreshToken)
 
 	cli := New(WithStore(client))
 

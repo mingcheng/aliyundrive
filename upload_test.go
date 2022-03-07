@@ -33,6 +33,7 @@ func TestAliyunDrive_UploadFile(t *testing.T) {
 			DriveID: self.DefaultDriveID,
 			FileID:  result.FileID,
 		})
+
 		assert.NoError(t, err)
 	}
 }

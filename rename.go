@@ -29,16 +29,15 @@ type RenameFileReq struct {
 
 type RenameFileResp struct {
 	DriveID          string `json:"drive_id"`
-	SboxUsedSize     int    `json:"sbox_used_size"`
-	SboxRealUsedSize int    `json:"sbox_real_used_size"`
-	SboxTotalSize    int64  `json:"sbox_total_size"`
+	UsedSize         int    `json:"sbox_used_size"`
+	RealUsedSize     int    `json:"sbox_real_used_size"`
+	TotalSize        int64  `json:"sbox_total_size"`
 	RecommendVip     string `json:"recommend_vip"`
 	PinSetup         bool   `json:"pin_setup"`
 	Locked           bool   `json:"locked"`
 	InsuranceEnabled bool   `json:"insurance_enabled"`
 }
 
-// Rename 重命名
 func (r *AliyunDrive) Rename(ctx context.Context, request *RenameFileReq) (*RenameFileResp, error) {
 	var result RenameFileResp
 

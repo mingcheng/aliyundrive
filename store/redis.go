@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"github.com/go-redis/redis/v8"
+	"time"
 )
 
 type RedisStore struct {
@@ -10,7 +11,7 @@ type RedisStore struct {
 }
 
 func (s *RedisStore) Set(ctx context.Context, key string, data []byte) error {
-	status := s.client.Set(ctx, key, data, redis.KeepTTL)
+	status := s.client.Set(ctx, key, data, time.Hour*24)
 	return status.Err()
 }
 

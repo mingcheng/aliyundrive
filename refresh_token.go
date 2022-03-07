@@ -18,6 +18,7 @@ package aliyundrive
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 )
@@ -61,25 +62,26 @@ type RefreshTokenResp struct {
 }
 
 func (r *AliyunDrive) RefreshToken(ctx context.Context, request *RefreshTokenReq) (*RefreshTokenResp, error) {
+	var result RefreshTokenResp
+
 	if strings.TrimSpace(request.RefreshToken) == "" {
 		return nil, fmt.Errorf("refresh token is empty")
 	}
 
 	request.GrantType = "refresh_token"
 
-	response, err := r.client.R().
-		SetContext(ctx).
-		SetBody(request).
-		SetResult(RefreshTokenResp{}).
-		Post("https://auth.aliyundrive.com/v2/account/token")
+	response, err := r.request(ctx, &config{
+		Method: http.MethodPost,
+		URL:    "https://auth.aliyundrive.com/v2/account/token",
+		Body:   request,
+	}, &result)
 
 	if err != nil {
 		return nil, err
 	}
 
-	result := response.Result().(*RefreshTokenResp)
-	if strings.TrimSpace(result.RefreshToken) == "" {
-		return nil, fmt.Errorf("response refersh token is empty")
+	if !response.IsSuccess() {
+		return nil, fmt.Errorf("%s", response.Status())
 	}
 
 	// save token information
@@ -87,12 +89,11 @@ func (r *AliyunDrive) RefreshToken(ctx context.Context, request *RefreshTokenReq
 		if err := r.store.Set(ctx, KeyAccessToken, []byte(result.AccessToken)); err != nil {
 			return nil, err
 		}
-
 		if err := r.store.Set(ctx, KeyRefreshToken, []byte(result.RefreshToken)); err != nil {
 			return nil, err
 		}
 	}
-
 	r.accessToken = result.AccessToken
-	return result, nil
+
+	return &result, nil
 }
