@@ -42,14 +42,16 @@ type RenameFileResp struct {
 func (r *AliyunDrive) Rename(ctx context.Context, request *RenameFileReq) (*RenameFileResp, error) {
 	var result RenameFileResp
 
-	//
-	request.CheckNameMode = "refuse"
+	if request.CheckNameMode == "" {
+		request.CheckNameMode = ModeRefuse
+	}
 
 	_, err := r.request(ctx, &config{
 		Method: http.MethodPost,
 		URL:    "https://api.aliyundrive.com/v3/file/update",
 		Body:   request,
 	}, &result)
+
 	if err != nil {
 		return nil, err
 	}

@@ -27,6 +27,7 @@ func TestAliyunDrive_UploadFile(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.NotEmpty(t, result.FileID)
+		assert.True(t, result.Size > 0)
 
 		err = cli.Trash(context.TODO(), &DeleteFileReq{
 			DriveID: self.DefaultDriveID,

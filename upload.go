@@ -188,7 +188,7 @@ func (r *AliyunDrive) createFileWithProof(ctx context.Context, request *createFi
 	return &result, nil
 }
 
-func (r *AliyunDrive) uploadPart(ctx context.Context, uri string, reader io.Reader) error {
+func (r *AliyunDrive) uploadPart(_ context.Context, uri string, reader io.Reader) error {
 	req, err := http.NewRequest(http.MethodPut, uri, reader)
 
 	response, err := r.client.GetClient().Do(req)
