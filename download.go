@@ -17,40 +17,44 @@ package aliyundrive
 
 import (
 	"context"
+	"fmt"
 	"net/http"
-	"time"
 )
 
-type GetFileDownloadURLReq struct {
+type DownloadReq struct {
 	DriveID string `json:"drive_id"`
 	FileID  string `json:"file_id"`
 }
 
-type GetFileDownloadURLResp struct {
-	Method      string    `json:"method"`
-	URL         string    `json:"url"`
-	InternalURL string    `json:"internal_url"`
-	CdnURL      string    `json:"cdn_url"`
-	Expiration  time.Time `json:"expiration"`
-	Size        int       `json:"size"`
+type DownloadResp struct {
+	Method      string `json:"method"`
+	URL         string `json:"url"`
+	InternalURL string `json:"internal_url"`
+	CdnURL      string `json:"cdn_url"`
+	Expiration  string `json:"expiration"`
+	Size        int    `json:"size"`
 	RateLimit   struct {
 		PartSpeed int `json:"part_speed"`
 		PartSize  int `json:"part_size"`
 	} `json:"ratelimit"`
 }
 
-func (r *AliyunDrive) DownloadURL(ctx context.Context, request *GetFileDownloadURLReq) (*GetFileDownloadURLResp, error) {
-	var response GetFileDownloadURLResp
+func (r *AliyunDrive) DownloadURL(ctx context.Context, request *DownloadReq) (*DownloadResp, error) {
+	var result DownloadResp
 
-	_, err := r.request(ctx, &config{
+	response, err := r.request(ctx, &config{
 		Method: http.MethodPost,
 		URL:    "https://api.aliyundrive.com/v2/file/get_download_url",
 		Body:   request,
-	}, &response)
+	}, &result)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &response, nil
+	if !response.IsSuccess() || result.URL == "" || result.Method == "" {
+		return nil, fmt.Errorf("can not get download url")
+	}
+
+	return &result, nil
 }
