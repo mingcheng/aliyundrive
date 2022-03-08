@@ -2,7 +2,11 @@ package store
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
+	"os"
+	"path"
+	"syscall"
 )
 
 type FileStore struct {
@@ -10,7 +14,12 @@ type FileStore struct {
 }
 
 func (f FileStore) Get(ctx context.Context, key string) ([]byte, error) {
-	bs, err := ioutil.ReadFile(f.Path)
+	path, err := f.getPath(key)
+	if err != nil {
+		return nil, err
+	}
+
+	bs, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -19,11 +28,34 @@ func (f FileStore) Get(ctx context.Context, key string) ([]byte, error) {
 }
 
 func (f FileStore) Set(ctx context.Context, key string, data []byte) error {
-	return ioutil.WriteFile(f.Path, data, 0o600)
+	path, err := f.getPath(key)
+	if err != nil {
+		return err
+	}
+
+	return ioutil.WriteFile(path, data, 0o600)
 }
 
-func NewFileStore(file string) *FileStore {
-	return &FileStore{
-		Path: file,
+func (f FileStore) getPath(key string) (string, error) {
+	return path.Join(f.Path, key+".txt"), nil
+}
+
+func NewFileStore(dir string) (*FileStore, error) {
+	info, err := os.Stat(dir)
+	if err != nil {
+		return nil, err
 	}
+
+	if !info.IsDir() {
+		return nil, fmt.Errorf("%s must be a directory", info.Name())
+	}
+
+	err = syscall.Access(dir, syscall.O_RDWR)
+	if err != nil {
+		return nil, fmt.Errorf("%s is not writeable", dir)
+	}
+
+	return &FileStore{
+		Path: dir,
+	}, nil
 }
