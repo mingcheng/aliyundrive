@@ -3,11 +3,17 @@ package store
 import (
 	"context"
 	"github.com/stretchr/testify/assert"
+	"os"
 	"testing"
 )
 
 func TestNewFileStore(t *testing.T) {
-	store, err := NewFileStore("/Users/mingcheng/.aliyundrive")
+	fileStorePath := os.Getenv("FILE_STORE_PATH")
+	if fileStorePath == "" {
+		return
+	}
+
+	store, err := NewFileStore(fileStorePath)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, store)
