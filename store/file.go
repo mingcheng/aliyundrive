@@ -14,12 +14,12 @@ type FileStore struct {
 }
 
 func (f FileStore) Get(ctx context.Context, key string) ([]byte, error) {
-	path, err := f.getPath(key)
+	getPath, err := f.getPath(key)
 	if err != nil {
 		return nil, err
 	}
 
-	bs, err := ioutil.ReadFile(path)
+	bs, err := ioutil.ReadFile(getPath)
 	if err != nil {
 		return nil, err
 	}
@@ -28,12 +28,12 @@ func (f FileStore) Get(ctx context.Context, key string) ([]byte, error) {
 }
 
 func (f FileStore) Set(ctx context.Context, key string, data []byte) error {
-	path, err := f.getPath(key)
+	getPath, err := f.getPath(key)
 	if err != nil {
 		return err
 	}
 
-	return ioutil.WriteFile(path, data, 0o600)
+	return ioutil.WriteFile(getPath, data, 0o600)
 }
 
 func (f FileStore) getPath(key string) (string, error) {
