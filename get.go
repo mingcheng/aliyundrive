@@ -17,9 +17,29 @@ package aliyundrive
 
 import (
 	"context"
+	"net/http"
 )
 
-type Store interface {
-	Get(ctx context.Context, key string) ([]byte, error)
-	Set(ctx context.Context, key string, data []byte) error
+type GetFileReq struct {
+	DriveID string `json:"drive_id"`
+	FileID  string `json:"file_id"`
+}
+
+type GetFileResp struct {
+	File
+	Trashed bool `json:"trashed"`
+}
+
+func (r *AliyunDrive) Get(ctx context.Context, request *GetFileReq) (*GetFileResp, error) {
+	var resp GetFileResp
+
+	if _, err := r.request(ctx, &config{
+		Method: http.MethodPost,
+		URL:    "https://api.aliyundrive.com/v2/file/get",
+		Body:   request,
+	}, &resp); err != nil {
+		return nil, err
+	}
+
+	return &resp, nil
 }
