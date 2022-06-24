@@ -13,7 +13,7 @@ type FileStore struct {
 	Path string
 }
 
-func (f FileStore) Get(ctx context.Context, key string) ([]byte, error) {
+func (f *FileStore) Get(_ context.Context, key string) ([]byte, error) {
 	getPath, err := f.getPath(key)
 	if err != nil {
 		return nil, err
@@ -27,7 +27,7 @@ func (f FileStore) Get(ctx context.Context, key string) ([]byte, error) {
 	return bs, nil
 }
 
-func (f FileStore) Set(ctx context.Context, key string, data []byte) error {
+func (f *FileStore) Set(_ context.Context, key string, data []byte) error {
 	getPath, err := f.getPath(key)
 	if err != nil {
 		return err
@@ -36,7 +36,7 @@ func (f FileStore) Set(ctx context.Context, key string, data []byte) error {
 	return ioutil.WriteFile(getPath, data, 0o600)
 }
 
-func (f FileStore) getPath(key string) (string, error) {
+func (f *FileStore) getPath(key string) (string, error) {
 	return path.Join(f.Path, key+".txt"), nil
 }
 
