@@ -20,22 +20,6 @@ import (
 	"net/http"
 )
 
-func (r *AliyunDrive) Path(ctx context.Context, request *PathReq) (*PathResp, error) {
-	var pathResp PathResp
-
-	_, err := r.request(ctx, &config{
-		Method: http.MethodPost,
-		URL:    "https://api.aliyundrive.com/adrive/v1/file/get_path",
-		Body:   request,
-	}, &pathResp)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &pathResp, nil
-}
-
 type PathReq struct {
 	DriveID string `json:"drive_id"`
 	FileID  string `json:"file_id"`
@@ -43,4 +27,20 @@ type PathReq struct {
 
 type PathResp struct {
 	Items []*File `json:"items"`
+}
+
+func (r *AliyunDrive) Path(ctx context.Context, request *PathReq) (*PathResp, error) {
+	var resp PathResp
+
+	_, err := r.request(ctx, &config{
+		Method: http.MethodPost,
+		URL:    "https://api.aliyundrive.com/adrive/v1/file/get_path",
+		Body:   request,
+	}, &resp)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &resp, nil
 }

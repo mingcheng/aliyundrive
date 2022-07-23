@@ -7,16 +7,16 @@ import (
 )
 
 type RedisStore struct {
-	client *redis.Client
+	Client *redis.Client
 }
 
 func (s *RedisStore) Set(ctx context.Context, key string, data []byte) error {
-	status := s.client.Set(ctx, key, data, time.Hour*24)
+	status := s.Client.Set(ctx, key, data, time.Hour*24)
 	return status.Err()
 }
 
 func (s *RedisStore) Get(ctx context.Context, key string) ([]byte, error) {
-	result := s.client.Get(ctx, key)
+	result := s.Client.Get(ctx, key)
 	if result.Err() != nil {
 		return nil, result.Err()
 	}
@@ -33,6 +33,6 @@ func NewRedisStore(options *redis.Options) (*RedisStore, error) {
 	}
 
 	return &RedisStore{
-		client: client,
+		Client: client,
 	}, nil
 }
